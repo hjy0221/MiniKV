@@ -1,5 +1,73 @@
 # MiniKV
 
+[日本語](https://github.com/hjy0221/MiniKV#%E6%97%A5%E6%9C%AC%E8%AA%9E) · [English](https://github.com/hjy0221/MiniKV#english) · [한국어](https://github.com/hjy0221/MiniKV#%ED%95%9C%EA%B5%AD%EC%96%B4)
+
+## 日本語
+
+MiniKV は外部ランタイム依存のない C++17 の小型ストレージエンジンです。ファイル永続化、クラッシュ復旧、キャッシュ、並行処理、非同期レプリケーションを実装しています。
+
+### 機能
+
+- `PUT`、`GET`、`DELETE` の CLI、追記専用バイナリログとメモリ内ハッシュインデックス
+- チェックサム付き WAL、連番、不完全な末尾レコードを無視する復旧
+- 容量制限付き O(1) LRU キャッシュ、スレッドセーフなアクセス、1/2/4/8 スレッドのベンチマーク
+- 永続レプリカへの順序保証付き非同期複製
+
+ログ形式、耐久性、ロックとトレードオフは[設計文書](docs/DESIGN.md)を参照してください。
+
+### ビルドとテスト
+
+Windows PowerShell / GCC・MSYS2:
+
+```powershell
+.\build.ps1
+.\build\minikv_tests.exe
+.\build\minikv.exe data\store.log
+```
+
+Linux / macOS:
+
+```bash
+make
+make test
+./build/minikv data/store.log
+```
+
+CMake: `cmake -S . -B build`、`cmake --build build`、`ctest --test-dir build`。
+
+### ベンチマークと制限
+
+1万キー、書き込み60%、読み取り30%、削除10%のワークロードを CSV に出力します。2026-09-08 の GCC `-O2`・20万操作では、1/2/4/8 スレッドでそれぞれ 423,168 / 212,513 / 210,552 / 143,273 ops/s でした。共通の排他ロックによる競合が要因です。[測定結果](benchmark-results.csv)を参照してください。複製は単一プロセス内の順序・fan-out・永続性・確認を示すもので、合意プロトコルではありません。
+
+## English
+
+MiniKV is a C++17 mini storage engine with no external runtime dependencies. It grows from an in-memory key-value map to include file persistence, crash recovery, caching, concurrency, and asynchronous replication.
+
+### Features
+
+- Interactive `PUT`, `GET`, and `DELETE` CLI; in-memory hash index backed by an append-only binary log.
+- Checksummed write-ahead records with monotonically increasing sequence numbers and recovery that safely ignores an incomplete final record.
+- Bounded O(1) LRU cache with hit/miss statistics, thread-safe access, and reproducible 1/2/4/8-thread benchmarks.
+- Ordered asynchronous replication to one or more persistent replicas, without third-party libraries.
+
+See [the design document](docs/DESIGN.md) for the log format, durability model, locking, and tradeoffs.
+
+### Build and test
+
+On Windows with PowerShell and GCC/MSYS2, run `build.ps1`, `build/minikv_tests.exe`, and `build/minikv.exe data/store.log`. On Linux/macOS, run `make`, `make test`, and `./build/minikv data/store.log`. CMake is also supported: `cmake -S . -B build`, `cmake --build build`, then `ctest --test-dir build`. The Korean section above contains complete commands and a CLI example.
+
+### Benchmark
+
+The deterministic workload uses a 10,000-key working set with 60% writes, 30% reads, and 10% deletes, producing CSV output. Run `build/minikv_bench.exe 200000` on Windows. Measurements depend on the machine, filesystem, compiler, and background load; compare scaling rather than the absolute numbers. Raw results are stored in [benchmark-results.csv](benchmark-results.csv).
+
+On 2026-09-08, GCC `-O2`, 200,000 operations yielded 423,168, 212,513, 210,552, and 143,273 ops/s for 1, 2, 4, and 8 threads respectively (1.00x, 0.50x, 0.50x, 0.34x). Throughput declined because file append, index changes, statistics, and LRU updates share an exclusive engine lock. Potential experiments include atomic read statistics and a shared read lock, followed by WAL batching and index sharding.
+
+### Structure and limitations
+
+`include/minikv/` exposes engine, cache, and replication APIs; `src/` contains the implementation and CLI; `tests/` covers persistence, partial-write recovery, concurrency, and replication; `benchmarks/` contains the mixed workload; and `docs/` describes design tradeoffs. Replication demonstrates ordering, fan-out, replica durability, and acknowledgment barriers within one process; it is not a consensus protocol. The boundaries allow future TCP transport and Raft quorum support without changing the core record and apply model.
+
+## 한국어
+
 MiniKV는 외부 런타임 의존성이 없는 C++17 미니 스토리지 엔진이다. 메모리 기반
 key-value map에서 출발해 파일 영속성, 비정상 종료 복구, 캐시, 동시성, 비동기
 복제까지 단계적으로 구현했다.
@@ -107,32 +175,3 @@ docs/                  설계와 트레이드오프 문서
 복제 계층은 한 프로세스 안에서 연산 순서, fan-out, replica 영속성과 확인 장벽을
 보여주기 위한 구현이다. 합의 프로토콜은 아니다. 코어 레코드 및 적용 모델을 바꾸지
 않고 TCP 전송과 Raft quorum을 추가할 수 있도록 경계를 분리했다.
-
----
-
-## English
-
-MiniKV is a C++17 mini storage engine with no external runtime dependencies. It grows from an in-memory key-value map to include file persistence, crash recovery, caching, concurrency, and asynchronous replication.
-
-### Features
-
-- Interactive `PUT`, `GET`, and `DELETE` CLI; in-memory hash index backed by an append-only binary log.
-- Checksummed write-ahead records with monotonically increasing sequence numbers and recovery that safely ignores an incomplete final record.
-- Bounded O(1) LRU cache with hit/miss statistics, thread-safe access, and reproducible 1/2/4/8-thread benchmarks.
-- Ordered asynchronous replication to one or more persistent replicas, without third-party libraries.
-
-See [the design document](docs/DESIGN.md) for the log format, durability model, locking, and tradeoffs.
-
-### Build and test
-
-On Windows with PowerShell and GCC/MSYS2, run `build.ps1`, `build/minikv_tests.exe`, and `build/minikv.exe data/store.log`. On Linux/macOS, run `make`, `make test`, and `./build/minikv data/store.log`. CMake is also supported: `cmake -S . -B build`, `cmake --build build`, then `ctest --test-dir build`. The Korean section above contains complete commands and a CLI example.
-
-### Benchmark
-
-The deterministic workload uses a 10,000-key working set with 60% writes, 30% reads, and 10% deletes, producing CSV output. Run `build/minikv_bench.exe 200000` on Windows. Measurements depend on the machine, filesystem, compiler, and background load; compare scaling rather than the absolute numbers. Raw results are stored in [benchmark-results.csv](benchmark-results.csv).
-
-On 2026-09-08, GCC `-O2`, 200,000 operations yielded 423,168, 212,513, 210,552, and 143,273 ops/s for 1, 2, 4, and 8 threads respectively (1.00x, 0.50x, 0.50x, 0.34x). Throughput declined because file append, index changes, statistics, and LRU updates share an exclusive engine lock. Potential experiments include atomic read statistics and a shared read lock, followed by WAL batching and index sharding.
-
-### Structure and limitations
-
-`include/minikv/` exposes engine, cache, and replication APIs; `src/` contains the implementation and CLI; `tests/` covers persistence, partial-write recovery, concurrency, and replication; `benchmarks/` contains the mixed workload; and `docs/` describes design tradeoffs. Replication demonstrates ordering, fan-out, replica durability, and acknowledgment barriers within one process; it is not a consensus protocol. The boundaries allow future TCP transport and Raft quorum support without changing the core record and apply model.
